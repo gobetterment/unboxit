@@ -31,31 +31,6 @@
   - 데이터베이스: PostgreSQL
 - 상태 관리: Provider
 
-## 설치 방법
-
-1. 저장소 클론
-
-```bash
-git clone https://github.com/gobetterment/unboxit.git
-```
-
-2. 의존성 설치
-
-```bash
-flutter pub get
-```
-
-3. 환경 변수 설정
-
-- `.env.example` 파일을 `.env`로 복사
-- Supabase 프로젝트 설정에 맞게 값 수정
-
-4. 실행
-
-```bash
-flutter run
-```
-
 ## 라이선스
 
 MIT License
