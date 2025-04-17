@@ -48,19 +48,11 @@
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>unboxit</string>
-			</array>
-			<key>CFBundleURLName</key>
-			<string>com.example.unboxit</string>
-		</dict>
-		<dict>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.googleusercontent.apps.117916696621-bq01rb1hobrdgri1bks3ltge64e6i36g</string>
+				<string>com.googleusercontent.apps.11791669621-bq01rb1hobrdgri1bks3ltge64e6i36g</string>
 			</array>
 		</dict>
 	</array>
@@ -75,5 +67,7 @@
 	<array>
 		<string>Default</string>
 	</array>
+	<key>GIDClientID</key>
+	<string>11791669621-bq01rb1hobrdgri1bks3ltge64e6i36g.apps.googleusercontent.com</string>
 </dict>
 </plist>

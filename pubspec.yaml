@@ -45,6 +45,8 @@ dependencies:
   flutter_dotenv: ^5.1.0
   google_sign_in: ^6.2.2
   sign_in_with_apple: ^5.0.0
+  font_awesome_flutter: ^10.8.0
+  flutter_slidable: ^3.0.1
 
 dev_dependencies:
   flutter_test:
@@ -95,13 +97,13 @@ flutter:
   # see https://flutter.dev/to/font-from-package
 
   assets:
+    - assets/images/
     - .env
-    - assets/icon/
 
 flutter_launcher_icons:
-  android: true
+  android: "launcher_icon"
   ios: true
-  image_path: "assets/icon/app_icon.png" # 1024x1024 크기의 원본 아이콘
+  image_path: "assets/images/app_icon.png"
   adaptive_icon_background: "#FFFFFF"
   min_sdk_android: 21
   remove_alpha_ios: true

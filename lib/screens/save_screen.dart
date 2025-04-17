@@ -410,8 +410,13 @@ class _SaveScreenState extends State<SaveScreen> {
         return;
       }
 
+      // 태그를 배열로 처리
       final tags = _tagsController.text.isNotEmpty
-          ? _tagsController.text.split(',').map((e) => e.trim()).toList()
+          ? _tagsController.text
+              .split(',')
+              .map((e) => e.trim())
+              .where((e) => e.isNotEmpty)
+              .toList()
           : <String>[];
 
       await Supabase.instance.client.from('links').insert({
@@ -421,7 +426,7 @@ class _SaveScreenState extends State<SaveScreen> {
         'image': metadata['image'] ?? '',
         'site_name': metadata['site_name'] ?? '',
         'favicon': metadata['favicon'] ?? '',
-        'tags': tags,
+        'tags': tags, // 배열로 저장
         'memo': _memoController.text,
         'user_id': Supabase.instance.client.auth.currentUser?.id,
       });

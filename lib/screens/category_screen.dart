@@ -71,7 +71,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
     _availableTags.clear();
     _tagCounts.clear();
     for (var link in _links) {
-      final tags = (link['tags'] as List?)?.cast<String>() ?? [];
+      final tags = (link['tags'] as List<dynamic>?)?.cast<String>() ?? [];
       for (var tag in tags) {
         _availableTags.add(tag);
         _tagCounts[tag] = (_tagCounts[tag] ?? 0) + 1;
@@ -89,7 +89,10 @@ class _CategoryScreenState extends State<CategoryScreen> {
         final title = (link['title'] ?? '').toLowerCase();
         final description = (link['description'] ?? '').toLowerCase();
         final memo = (link['memo'] ?? '').toLowerCase();
-        final tags = (link['tags'] as List?)?.join(' ').toLowerCase() ?? '';
+        final tags = (link['tags'] as List<dynamic>?)
+                ?.map((e) => e.toString().toLowerCase())
+                .join(' ') ??
+            '';
 
         return title.contains(searchTerm) ||
             description.contains(searchTerm) ||
@@ -124,7 +127,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
     // 태그 필터링
     if (_selectedTags.isNotEmpty) {
       filtered = filtered.where((link) {
-        final linkTags = (link['tags'] as List?)?.cast<String>() ?? [];
+        final linkTags = (link['tags'] as List<dynamic>?)?.cast<String>() ?? [];
         return _selectedTags.any((tag) => linkTags.contains(tag));
       }).toList();
     }
@@ -395,12 +398,12 @@ class _CategoryScreenState extends State<CategoryScreen> {
                 overflow: TextOverflow.ellipsis,
               ),
             ],
-            if ((link['tags'] as List?)?.isNotEmpty ?? false) ...[
+            if ((link['tags'] as List<dynamic>?)?.isNotEmpty ?? false) ...[
               const SizedBox(height: 8),
               Wrap(
                 spacing: 4,
                 runSpacing: 4,
-                children: (link['tags'] as List)
+                children: (link['tags'] as List<dynamic>)
                     .map((tag) => Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 8,
