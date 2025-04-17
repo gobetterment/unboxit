@@ -3,6 +3,10 @@
         android:label="unboxit"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <!-- 애드몹 앱 ID -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-3940256099942544~3347511713"/>
         <activity
             android:name=".MainActivity"
             android:exported="true"

@@ -5,7 +5,6 @@ import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'home_screen.dart';
 import 'signup_screen.dart';
-import 'package:flutter/services.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -111,7 +110,7 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       final response = await Supabase.instance.client.auth.signInWithIdToken(
-        provider: Provider.google,
+        provider: OAuthProvider.google,
         idToken: idToken,
         accessToken: accessToken,
       );
@@ -158,7 +157,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       // Supabase에 Apple 로그인
       final response = await Supabase.instance.client.auth.signInWithIdToken(
-        provider: Provider.apple,
+        provider: OAuthProvider.apple,
         idToken: credential.identityToken!,
       );
 

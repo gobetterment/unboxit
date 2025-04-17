@@ -7,6 +7,8 @@ import 'save_screen.dart';
 import 'settings_screen.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'login_screen.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
+import '../services/ad_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -24,15 +26,24 @@ class _HomeScreenState extends State<HomeScreen> {
   final Set<String> _availableTags = <String>{};
   final Map<String, int> _tagCounts = {};
 
+  // 네이티브 광고 관련 변수
+  NativeAd? _nativeAd;
+  final bool _isAdLoaded = false;
+
+  final AdService _adService = AdService();
+
   @override
   void initState() {
     super.initState();
     _loadLinks();
+    _loadNativeAd();
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _nativeAd?.dispose();
+    _adService.disposeNativeAd();
     super.dispose();
   }
 
@@ -138,6 +149,11 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  Future<void> _loadNativeAd() async {
+    await _adService.loadNativeAd();
+    if (mounted) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -199,11 +215,17 @@ class _HomeScreenState extends State<HomeScreen> {
                     scrollDirection: Axis.horizontal,
                     child: Row(
                       children: _availableTags.map((tag) {
+                        final isSelected = _selectedTags.contains(tag);
                         return Padding(
                           padding: const EdgeInsets.only(right: 8),
                           child: FilterChip(
-                            label: Text('$tag (${_tagCounts[tag]})'),
-                            selected: _selectedTags.contains(tag),
+                            label: Text(
+                              '$tag (${_tagCounts[tag] ?? 0})',
+                              style: TextStyle(
+                                color: isSelected ? Colors.white : Colors.black,
+                              ),
+                            ),
+                            selected: isSelected,
                             onSelected: (selected) {
                               setState(() {
                                 if (selected) {
@@ -214,13 +236,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                 _filterLinks(_searchController.text);
                               });
                             },
-                            backgroundColor: Colors.grey[50],
-                            selectedColor: Colors.black.withOpacity(0.1),
-                            side: BorderSide(color: Colors.grey[300]!),
-                            labelStyle: const TextStyle(color: Colors.black),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
+                            backgroundColor: Colors.grey[100],
+                            selectedColor: Colors.black,
+                            checkmarkColor: Colors.white,
                           ),
                         );
                       }).toList(),
@@ -246,10 +264,25 @@ class _HomeScreenState extends State<HomeScreen> {
                       )
                     : ListView.builder(
                         padding: const EdgeInsets.all(16),
-                        itemCount: _filteredLinks.length,
+                        itemCount:
+                            _filteredLinks.length + (_isAdLoaded ? 1 : 0),
                         itemBuilder: (context, index) {
-                          final link = _filteredLinks[index];
-                          return _buildContentCard(link);
+                          // 광고 삽입 (5개의 콘텐츠마다)
+                          if (_isAdLoaded && index > 0 && index % 5 == 0) {
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 16),
+                              child: AdWidget(ad: _nativeAd!),
+                            );
+                          }
+
+                          // 실제 콘텐츠 인덱스 계산
+                          final contentIndex =
+                              _isAdLoaded && index > 0 && index % 5 == 0
+                                  ? index - 1
+                                  : index;
+
+                          return _buildContentCard(
+                              _filteredLinks[contentIndex]);
                         },
                       ),
           ),
@@ -269,6 +302,13 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildContentCard(Map<String, dynamic> link) {
+    if (link['isAd'] == true) {
+      return _buildNativeAdCard();
+    }
+    return _buildContentCardWithoutAd(link);
+  }
+
+  Widget _buildContentCardWithoutAd(Map<String, dynamic> link) {
     final formattedDate = DateTime.parse(link['created_at'])
         .toLocal()
         .toString()
@@ -378,12 +418,30 @@ class _HomeScreenState extends State<HomeScreen> {
                           ],
                           if (link['site_name']?.isNotEmpty ?? false) ...[
                             const SizedBox(height: 4),
-                            Text(
-                              link['site_name']!,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[600],
-                              ),
+                            Row(
+                              children: [
+                                if (link['favicon']?.isNotEmpty ?? false)
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(4),
+                                    child: Image.network(
+                                      link['favicon']!,
+                                      width: 16,
+                                      height: 16,
+                                      errorBuilder:
+                                          (context, error, stackTrace) =>
+                                              const SizedBox(),
+                                    ),
+                                  ),
+                                if (link['favicon']?.isNotEmpty ?? false)
+                                  const SizedBox(width: 4),
+                                Text(
+                                  link['site_name']!,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ],
@@ -421,6 +479,25 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildNativeAdCard() {
+    if (_adService.nativeAd == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey[300]!),
+      ),
+      child: Container(
+        height: 120,
+        padding: const EdgeInsets.all(8),
+        child: AdWidget(ad: _adService.nativeAd!),
       ),
     );
   }

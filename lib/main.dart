@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uni_links/uni_links.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/save_screen.dart';
@@ -9,6 +10,9 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 void main() async {
   try {
     WidgetsFlutterBinding.ensureInitialized();
+
+    // 애드몹 초기화
+    await MobileAds.instance.initialize();
 
     await dotenv.load();
 
