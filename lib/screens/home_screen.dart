@@ -17,12 +17,20 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
   List<Map<String, dynamic>> _links = [];
+  List<Map<String, dynamic>> _filteredLinks = [];
   bool _isLoading = true;
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _loadLinks();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadLinks() async {
@@ -39,6 +47,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         setState(() {
           _links = List<Map<String, dynamic>>.from(response);
+          _filteredLinks = _links;
           _isLoading = false;
         });
       }
@@ -120,6 +129,29 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  void _filterLinks(String query) {
+    setState(() {
+      if (query.isEmpty) {
+        _filteredLinks = _links;
+      } else {
+        _filteredLinks = _links.where((link) {
+          final title = link['title']?.toString().toLowerCase() ?? '';
+          final description =
+              link['description']?.toString().toLowerCase() ?? '';
+          final tags = (link['tags'] as List<dynamic>?)
+                  ?.map((e) => e.toString().toLowerCase())
+                  .toList() ??
+              [];
+          final searchQuery = query.toLowerCase();
+
+          return title.contains(searchQuery) ||
+              description.contains(searchQuery) ||
+              tags.any((tag) => tag.contains(searchQuery));
+        }).toList();
+      }
+    });
+  }
+
   Widget _buildThumbnail(String? imageUrl) {
     if (imageUrl == null || imageUrl.isEmpty) {
       return Container(
@@ -183,22 +215,44 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
         title: const Text(
           '꺼내보기',
           style: TextStyle(
+            color: Colors.black,
             fontSize: 24,
             fontWeight: FontWeight.bold,
           ),
         ),
-        elevation: 0,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        scrolledUnderElevation: 0,
-        surfaceTintColor: Colors.white,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(60),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: '검색',
+                prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                filled: true,
+                fillColor: Colors.grey[100],
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+              ),
+              onChanged: _filterLinks,
+            ),
+          ),
+        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _links.isEmpty
+          : _filteredLinks.isEmpty
               ? const Center(
                   child: Text(
                     '저장된 링크가 없습니다',
@@ -210,9 +264,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 )
               : ListView.builder(
                   padding: const EdgeInsets.all(16),
-                  itemCount: _links.length,
+                  itemCount: _filteredLinks.length,
                   itemBuilder: (context, index) {
-                    final link = _links[index];
+                    final link = _filteredLinks[index];
                     return _buildContentCard(link);
                   },
                 ),

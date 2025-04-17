@@ -55,6 +55,14 @@
 			<key>CFBundleURLName</key>
 			<string>com.example.unboxit</string>
 		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.117916696621-bq01rb1hobrdgri1bks3ltge64e6i36g</string>
+			</array>
+		</dict>
 	</array>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
@@ -63,5 +71,9 @@
 	</array>
 	<key>NSPasteboardUsageDescription</key>
 	<string>URL을 붙여넣기 위해 클립보드 접근 권한이 필요합니다.</string>
+	<key>com.apple.developer.applesignin</key>
+	<array>
+		<string>Default</string>
+	</array>
 </dict>
 </plist>
