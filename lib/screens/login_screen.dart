@@ -334,12 +334,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     foregroundColor: Colors.black,
                     elevation: 0,
                     side: const BorderSide(color: Colors.black),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 12,
-                    ),
+                    minimumSize: const Size(double.infinity, 50),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
                   child: Row(
@@ -348,10 +345,40 @@ class _LoginScreenState extends State<LoginScreen> {
                       const FaIcon(FontAwesomeIcons.google, size: 18),
                       const SizedBox(width: 12),
                       Text(
-                        'Continue with Google',
+                        'Google로 계속하기',
                         style: TextStyle(
                           fontSize: 15,
                           color: Colors.grey[800],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                // 애플 로그인 버튼
+                ElevatedButton(
+                  onPressed: _isLoading ? null : _handleAppleSignIn,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.black,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    minimumSize: const Size(double.infinity, 50),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      FaIcon(FontAwesomeIcons.apple, size: 18),
+                      SizedBox(width: 12),
+                      Text(
+                        'Apple로 계속하기',
+                        style: TextStyle(
+                          fontSize: 15,
+                          color: Colors.white,
                         ),
                       ),
                     ],
