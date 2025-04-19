@@ -7,8 +7,6 @@ import 'save_screen.dart';
 import 'settings_screen.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'login_screen.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
-import '../services/ad_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -26,24 +24,15 @@ class _HomeScreenState extends State<HomeScreen> {
   final Set<String> _availableTags = <String>{};
   final Map<String, int> _tagCounts = {};
 
-  // 네이티브 광고 관련 변수
-  NativeAd? _nativeAd;
-  final bool _isAdLoaded = false;
-
-  final AdService _adService = AdService();
-
   @override
   void initState() {
     super.initState();
     _loadLinks();
-    _loadNativeAd();
   }
 
   @override
   void dispose() {
     _searchController.dispose();
-    _nativeAd?.dispose();
-    _adService.disposeNativeAd();
     super.dispose();
   }
 
@@ -147,11 +136,6 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _filteredLinks = filtered;
     });
-  }
-
-  Future<void> _loadNativeAd() async {
-    await _adService.loadNativeAd();
-    if (mounted) setState(() {});
   }
 
   @override
@@ -264,25 +248,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       )
                     : ListView.builder(
                         padding: const EdgeInsets.all(16),
-                        itemCount:
-                            _filteredLinks.length + (_isAdLoaded ? 1 : 0),
+                        itemCount: _filteredLinks.length,
                         itemBuilder: (context, index) {
-                          // 광고 삽입 (5개의 콘텐츠마다)
-                          if (_isAdLoaded && index > 0 && index % 5 == 0) {
-                            return Container(
-                              margin: const EdgeInsets.only(bottom: 16),
-                              child: AdWidget(ad: _nativeAd!),
-                            );
-                          }
-
-                          // 실제 콘텐츠 인덱스 계산
-                          final contentIndex =
-                              _isAdLoaded && index > 0 && index % 5 == 0
-                                  ? index - 1
-                                  : index;
-
-                          return _buildContentCard(
-                              _filteredLinks[contentIndex]);
+                          return _buildContentCard(_filteredLinks[index]);
                         },
                       ),
           ),
@@ -302,13 +270,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildContentCard(Map<String, dynamic> link) {
-    if (link['isAd'] == true) {
-      return _buildNativeAdCard();
-    }
-    return _buildContentCardWithoutAd(link);
-  }
-
-  Widget _buildContentCardWithoutAd(Map<String, dynamic> link) {
     final formattedDate = DateTime.parse(link['created_at'])
         .toLocal()
         .toString()
@@ -479,25 +440,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildNativeAdCard() {
-    if (_adService.nativeAd == null) {
-      return const SizedBox.shrink();
-    }
-
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.grey[300]!),
-      ),
-      child: Container(
-        height: 120,
-        padding: const EdgeInsets.all(8),
-        child: AdWidget(ad: _adService.nativeAd!),
       ),
     );
   }

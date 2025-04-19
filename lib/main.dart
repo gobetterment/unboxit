@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:uni_links/uni_links.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:app_links/app_links.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/save_screen.dart';
@@ -10,10 +9,6 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 void main() async {
   try {
     WidgetsFlutterBinding.ensureInitialized();
-
-    // 애드몹 초기화
-    await MobileAds.instance.initialize();
-
     await dotenv.load();
 
     await Supabase.initialize(
@@ -43,16 +38,18 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   final _navigatorKey = GlobalKey<NavigatorState>();
+  late AppLinks _appLinks;
 
   @override
   void initState() {
     super.initState();
-    _handleIncomingLinks();
+    _initAppLinks();
   }
 
-  void _handleIncomingLinks() {
-    uriLinkStream.listen((Uri? uri) {
-      if (uri != null && uri.scheme == 'unboxit' && uri.host == 'share') {
+  void _initAppLinks() async {
+    _appLinks = AppLinks();
+    _appLinks.uriLinkStream.listen((Uri uri) {
+      if (uri.scheme == 'unboxit' && uri.host == 'share') {
         final sharedUrl = uri.queryParameters['url'];
         if (sharedUrl != null) {
           _navigateToSaveScreen(sharedUrl);

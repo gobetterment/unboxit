@@ -4,9 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:http/http.dart' as http;
 import 'package:html/parser.dart' as parser;
 import 'package:html/dom.dart' as dom;
-import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'dart:convert';
-import '../services/ad_service.dart';
 
 class SaveScreen extends StatefulWidget {
   final String? initialUrl;
@@ -292,11 +290,6 @@ class _SaveScreenState extends State<SaveScreen> {
   bool _isLoading = false;
   Map<String, dynamic>? _metadata;
 
-  // 배너 광고 관련 변수
-  BannerAd? _bannerAd;
-  bool _isAdLoaded = false;
-  final AdService _adService = AdService();
-
   @override
   void initState() {
     super.initState();
@@ -310,9 +303,6 @@ class _SaveScreenState extends State<SaveScreen> {
         }
       });
     }
-    _loadBannerAd();
-    _adService.loadRewardedAd();
-    _adService.loadUserMaxSaves();
   }
 
   String? _extractDomain(String url) {
@@ -348,57 +338,14 @@ class _SaveScreenState extends State<SaveScreen> {
 
   Future<Map<String, dynamic>?> _fetchMetadata(String url) async {
     try {
-      print('URL 파싱 시작: $url');
-      final strategy = MetadataParser.getStrategy(url);
-      return await strategy.parse(url);
+      final normalizedUrl = _normalizeYouTubeUrl(url);
+
+      final strategy = MetadataParser.getStrategy(normalizedUrl);
+      return strategy.parse(normalizedUrl);
     } catch (e) {
-      print('메타데이터 파싱 오류: $e');
-      print('스택 트레이스: ${e is Error ? e.stackTrace : ''}');
+      print('메타데이터 가져오기 오류: $e');
       return null;
     }
-  }
-
-  String _resolveUrl(String baseUrl, String relativeUrl) {
-    if (relativeUrl.startsWith('http')) {
-      return relativeUrl;
-    }
-    return Uri.parse(baseUrl).resolve(relativeUrl).toString();
-  }
-
-  String? _getMetaContent(dom.Document document, String property) {
-    final metaTag = document.querySelector('meta[property="$property"]') ??
-        document.querySelector('meta[name="$property"]');
-    return metaTag?.attributes['content'];
-  }
-
-  String _getFavicon(dom.Document document, String baseUrl) {
-    // 1. apple-touch-icon 확인
-    final appleIcon = document
-        .querySelector('link[rel="apple-touch-icon"]')
-        ?.attributes['href'];
-    if (appleIcon != null) {
-      return _resolveUrl(baseUrl, appleIcon);
-    }
-
-    // 2. 일반 favicon 확인
-    final standardIcon = document
-            .querySelector('link[rel="icon"]')
-            ?.attributes['href'] ??
-        document.querySelector('link[rel="shortcut icon"]')?.attributes['href'];
-    if (standardIcon != null) {
-      return _resolveUrl(baseUrl, standardIcon);
-    }
-
-    // 3. 도메인별 기본 파비콘
-    final uri = Uri.parse(baseUrl);
-    if (uri.host.contains('blog.naver.com')) {
-      return 'https://blog.naver.com/favicon.ico';
-    } else if (uri.host.contains('velog.io')) {
-      return 'https://static.velog.io/favicon.ico';
-    }
-
-    // 4. 기본 /favicon.ico 시도
-    return '${uri.scheme}://${uri.host}/favicon.ico';
   }
 
   Future<void> _handleSave() async {
@@ -407,38 +354,6 @@ class _SaveScreenState extends State<SaveScreen> {
         const SnackBar(content: Text('URL을 입력해주세요')),
       );
       return;
-    }
-
-    if (!_adService.canSaveMore()) {
-      final shouldShowAd = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('저장 제한'),
-          content: const Text('더 많은 콘텐츠를 저장하려면 광고를 시청하세요.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('취소'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('광고 시청'),
-            ),
-          ],
-        ),
-      );
-
-      if (shouldShowAd == true) {
-        final rewardGranted = await _adService.showRewardedAd();
-        if (!rewardGranted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('광고 로드에 실패했습니다.')),
-          );
-          return;
-        }
-      } else {
-        return;
-      }
     }
 
     setState(() {
@@ -477,8 +392,6 @@ class _SaveScreenState extends State<SaveScreen> {
         'created_at': DateTime.now().toIso8601String(),
       });
 
-      _adService.incrementSavedCount();
-
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('링크가 저장되었습니다')),
@@ -501,27 +414,6 @@ class _SaveScreenState extends State<SaveScreen> {
     }
   }
 
-  void _loadBannerAd() {
-    _bannerAd = BannerAd(
-      adUnitId: _adService.bannerAdUnitId,
-      size: AdSize.banner,
-      request: const AdRequest(),
-      listener: BannerAdListener(
-        onAdLoaded: (_) {
-          setState(() {
-            _isAdLoaded = true;
-          });
-          print('배너 광고 로드 성공');
-        },
-        onAdFailedToLoad: (ad, error) {
-          print('배너 광고 로드 실패: $error');
-          ad.dispose();
-        },
-      ),
-    );
-    _bannerAd?.load();
-  }
-
   @override
   void dispose() {
     _urlController.dispose();
@@ -529,7 +421,6 @@ class _SaveScreenState extends State<SaveScreen> {
     _descriptionController.dispose();
     _tagsController.dispose();
     _memoController.dispose();
-    _bannerAd?.dispose();
     super.dispose();
   }
 
@@ -540,198 +431,166 @@ class _SaveScreenState extends State<SaveScreen> {
         : null;
 
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: const Text(
-          '저장',
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        title: const Text('링크 저장'),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              TextField(
-                controller: _urlController,
-                decoration: InputDecoration(
-                  hintText: 'URL 입력',
-                  filled: true,
-                  fillColor: Colors.grey[100],
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
+      body: Form(
+        key: _formKey,
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            TextField(
+              controller: _urlController,
+              decoration: InputDecoration(
+                hintText: 'URL',
+                filled: true,
+                fillColor: Colors.grey[100],
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
                 ),
-                enabled: !_isLoading,
-                onSubmitted: (_) => _handleSave(),
               ),
-              if (_isLoading) ...[
-                const SizedBox(height: 16),
-                const Center(child: CircularProgressIndicator()),
-              ],
-              if (_metadata != null) ...[
-                const SizedBox(height: 16),
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (_metadata?['image']?.isNotEmpty ?? false)
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: CachedNetworkImage(
-                            imageUrl: _metadata!['image']!,
-                            height: 200,
-                            width: double.infinity,
-                            fit: BoxFit.cover,
-                            placeholder: (context, url) => const Center(
-                                child: CircularProgressIndicator()),
-                            errorWidget: (context, url, error) =>
-                                const Icon(Icons.error),
-                          ),
+              enabled: !_isLoading,
+            ),
+            const SizedBox(height: 16),
+            if (_metadata != null) ...[
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (_metadata?['image']?.isNotEmpty ?? false)
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: CachedNetworkImage(
+                          imageUrl: _metadata!['image']!,
+                          height: 200,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) =>
+                              const Center(child: CircularProgressIndicator()),
+                          errorWidget: (context, url, error) =>
+                              const Icon(Icons.error),
                         ),
-                      if (_metadata?['title']?.isNotEmpty ?? false) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          _metadata!['title']!,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
+                      ),
+                    if (_metadata?['title']?.isNotEmpty ?? false) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        _metadata!['title']!,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
                         ),
-                      ],
-                      if (_metadata?['description']?.isNotEmpty ?? false) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          _metadata!['description']!,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[600],
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                      if (domain != null) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          domain,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
+                      ),
                     ],
-                  ),
-                ),
-              ],
-              const SizedBox(height: 16),
-              TextField(
-                controller: _titleController,
-                decoration: InputDecoration(
-                  hintText: '제목',
-                  filled: true,
-                  fillColor: Colors.grey[100],
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-                enabled: !_isLoading,
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _descriptionController,
-                decoration: InputDecoration(
-                  hintText: '설명',
-                  filled: true,
-                  fillColor: Colors.grey[100],
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-                maxLines: 3,
-                enabled: !_isLoading,
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _tagsController,
-                decoration: InputDecoration(
-                  hintText: '태그 입력 (쉼표로 구분)',
-                  filled: true,
-                  fillColor: Colors.grey[100],
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-                enabled: !_isLoading,
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _memoController,
-                decoration: InputDecoration(
-                  hintText: '메모',
-                  filled: true,
-                  fillColor: Colors.grey[100],
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-                maxLines: 3,
-                enabled: !_isLoading,
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: _isLoading ? null : _handleSave,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.black,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: Text(
-                  _isLoading ? '저장 중...' : '저장',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
+                    if (_metadata?['description']?.isNotEmpty ?? false) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        _metadata!['description']!,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[600],
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                    if (domain != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        domain,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                '남은 저장 횟수: ${_adService.remainingSaves}',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              // 배너 광고
-              if (_isAdLoaded)
-                Container(
-                  alignment: Alignment.center,
-                  width: _bannerAd!.size.width.toDouble(),
-                  height: _bannerAd!.size.height.toDouble(),
-                  child: AdWidget(ad: _bannerAd!),
-                ),
             ],
-          ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _titleController,
+              decoration: InputDecoration(
+                hintText: '제목',
+                filled: true,
+                fillColor: Colors.grey[100],
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              enabled: !_isLoading,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _descriptionController,
+              decoration: InputDecoration(
+                hintText: '설명',
+                filled: true,
+                fillColor: Colors.grey[100],
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              maxLines: 3,
+              enabled: !_isLoading,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _tagsController,
+              decoration: InputDecoration(
+                hintText: '태그 (쉼표로 구분)',
+                filled: true,
+                fillColor: Colors.grey[100],
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              enabled: !_isLoading,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _memoController,
+              decoration: InputDecoration(
+                hintText: '메모',
+                filled: true,
+                fillColor: Colors.grey[100],
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              maxLines: 3,
+              enabled: !_isLoading,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: _isLoading ? null : _handleSave,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.black,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: Text(
+                _isLoading ? '저장 중...' : '저장',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
