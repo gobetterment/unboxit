@@ -1,19 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:flutter_slidable/flutter_slidable.dart';
-import 'dart:io' show Platform;
 import 'save_screen.dart';
 import 'settings_screen.dart';
-import 'package:flutter_svg/flutter_svg.dart';
-import 'login_screen.dart';
 import 'package:unboxit/models/link.dart';
-import 'package:unboxit/services/link_service.dart';
 import 'package:unboxit/widgets/link_card.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import '../models/sort_option.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -23,7 +14,6 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final LinkService _linkService = LinkService();
   List<Link> _allLinks = [];
   List<Link> _filteredLinks = [];
   bool _isLoading = true;
