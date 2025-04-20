@@ -1,33 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'login_screen.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
-  Future<void> _handleLogout(BuildContext context) async {
-    try {
-      // Supabase 로그아웃
-      await Supabase.instance.client.auth.signOut();
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
 
-      if (context.mounted) {
-        // 로그인 화면으로 이동하고 이전 화면들 모두 제거
+class _SettingsScreenState extends State<SettingsScreen> {
+  final storage = const FlutterSecureStorage();
+
+  Future<void> _handleLogout() async {
+    try {
+      await Supabase.instance.client.auth.signOut();
+      if (mounted) {
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(
             builder: (context) => const LoginScreen(),
-            settings: const RouteSettings(name: '/login'), // 라우트 이름 지정
+            settings: const RouteSettings(name: '/login'),
           ),
           (route) => false,
         );
       }
     } catch (e) {
-      if (context.mounted) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('로그아웃 중 오류가 발생했습니다: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('로그아웃 중 오류가 발생했습니다: $e')),
         );
       }
     }
@@ -38,36 +40,23 @@ class SettingsScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
         title: const Text(
           '설정',
           style: TextStyle(
-            fontSize: 24,
+            color: Colors.black,
+            fontSize: 20,
             fontWeight: FontWeight.bold,
           ),
         ),
-        elevation: 0,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
       ),
       body: ListView(
         children: [
           ListTile(
-            onTap: () => _handleLogout(context),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 24,
-              vertical: 8,
-            ),
-            title: const Text(
-              '로그아웃',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.red,
-              ),
-            ),
-            trailing: const Icon(
-              Icons.logout,
-              color: Colors.red,
-            ),
+            title: const Text('로그아웃'),
+            leading: const Icon(Icons.logout, color: Colors.black),
+            onTap: _handleLogout,
           ),
         ],
       ),

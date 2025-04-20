@@ -11,6 +11,9 @@ import 'login_screen.dart';
 import 'package:unboxit/models/link.dart';
 import 'package:unboxit/services/link_service.dart';
 import 'package:unboxit/widgets/link_card.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import '../models/sort_option.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -21,12 +24,15 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final LinkService _linkService = LinkService();
-  List<Link> _links = [];
+  List<Link> _allLinks = [];
+  List<Link> _filteredLinks = [];
   bool _isLoading = true;
   final TextEditingController _searchController = TextEditingController();
   final Set<String> _selectedTags = <String>{};
   final Set<String> _availableTags = <String>{};
   final Map<String, int> _tagCounts = {};
+  String? _error;
+  final _supabase = Supabase.instance.client;
 
   @override
   void initState() {
@@ -43,7 +49,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void _extractTags() {
     _availableTags.clear();
     _tagCounts.clear();
-    for (var link in _links) {
+    for (var link in _allLinks) {
       for (var tag in link.tags) {
         _availableTags.add(tag);
         _tagCounts[tag] = (_tagCounts[tag] ?? 0) + 1;
@@ -52,79 +58,88 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadLinks() async {
-    if (!mounted) return;
-
     try {
-      setState(() {
-        _isLoading = true;
-        _links = [];
-      });
+      setState(() => _isLoading = true);
 
-      final user = Supabase.instance.client.auth.currentUser;
-      if (user == null) {
-        if (mounted) {
-          Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const LoginScreen(),
-              settings: const RouteSettings(name: '/login'),
-            ),
-            (route) => false,
-          );
-        }
-        return;
-      }
-
-      final response = await Supabase.instance.client
+      final userId = _supabase.auth.currentUser!.id;
+      final data = await _supabase
           .from('links')
           .select()
-          .eq('user_id', user.id)
+          .eq('user_id', userId)
           .order('created_at', ascending: false);
 
-      if (mounted) {
-        setState(() {
-          _links = List<Link>.from(response.map((data) => Link.fromJson(data)));
-          _isLoading = false;
-        });
+      setState(() {
+        _allLinks = data.map((json) => Link.fromJson(json)).toList();
+        _filterLinks(_searchController.text);
         _extractTags();
-      }
+        _isLoading = false;
+      });
     } catch (e) {
-      print('링크 로드 오류: $e');
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('링크를 불러오는데 실패했습니다: $e'),
-            backgroundColor: Colors.red,
-          ),
+          const SnackBar(content: Text('링크를 불러오는데 실패했습니다.')),
         );
       }
     }
   }
 
   void _filterLinks(String query) {
-    List<Link> filtered = List.from(_links);
-
-    if (query.isNotEmpty) {
-      filtered = filtered.where((link) {
-        final title = link.title.toLowerCase();
-        final searchQuery = query.toLowerCase();
-        return title.contains(searchQuery) ||
-            link.tags.any((tag) => tag.toLowerCase().contains(searchQuery));
-      }).toList();
-    }
-
-    if (_selectedTags.isNotEmpty) {
-      filtered = filtered.where((link) {
-        return _selectedTags.any((tag) => link.tags.contains(tag));
-      }).toList();
-    }
-
     setState(() {
-      _links = filtered;
+      _filteredLinks = _allLinks.where((link) {
+        bool matchesQuery = true;
+        if (query.isNotEmpty) {
+          final searchQuery = query.toLowerCase();
+          matchesQuery = link.title.toLowerCase().contains(searchQuery) ||
+              link.tags.any((tag) => tag.toLowerCase().contains(searchQuery)) ||
+              (link.description?.toLowerCase().contains(searchQuery) ??
+                  false) ||
+              (link.memo?.toLowerCase().contains(searchQuery) ?? false);
+        }
+
+        bool matchesTags = true;
+        if (_selectedTags.isNotEmpty) {
+          matchesTags = _selectedTags.every((tag) => link.tags.contains(tag));
+        }
+
+        return matchesQuery && matchesTags;
+      }).toList();
     });
+  }
+
+  Future<void> _handleDelete(Link link) async {
+    try {
+      await _supabase.from('links').delete().eq('id', link.id);
+      setState(() {
+        _allLinks.remove(link);
+        _filterLinks(_searchController.text);
+        _extractTags();
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('링크가 삭제되었습니다')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('링크 삭제에 실패했습니다')),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleLaunch(Link link) async {
+    final url = Uri.parse(link.url);
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('URL을 열 수 없습니다')),
+        );
+      }
+    }
   }
 
   @override
@@ -180,37 +195,55 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: 12),
                 if (_availableTags.isNotEmpty)
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: _availableTags.map((tag) {
+                  SizedBox(
+                    height: 32,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _availableTags.length,
+                      itemBuilder: (context, index) {
+                        final tag = _availableTags.elementAt(index);
                         final isSelected = _selectedTags.contains(tag);
                         return Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: FilterChip(
-                            label: Text(
-                              '$tag (${_tagCounts[tag] ?? 0})',
-                              style: TextStyle(
-                                color: isSelected ? Colors.white : Colors.black,
-                              ),
-                            ),
-                            selected: isSelected,
-                            onSelected: (selected) {
+                          padding: EdgeInsets.only(
+                            left: index == 0 ? 0 : 8,
+                            right: index == _availableTags.length - 1 ? 0 : 0,
+                          ),
+                          child: InkWell(
+                            onTap: () {
                               setState(() {
-                                if (selected) {
-                                  _selectedTags.add(tag);
-                                } else {
+                                if (isSelected) {
                                   _selectedTags.remove(tag);
+                                } else {
+                                  _selectedTags.add(tag);
                                 }
                                 _filterLinks(_searchController.text);
                               });
                             },
-                            backgroundColor: Colors.grey[100],
-                            selectedColor: Colors.black,
-                            checkmarkColor: Colors.white,
+                            borderRadius: BorderRadius.circular(4),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? Colors.black
+                                    : Colors.grey[200],
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                '#$tag (${_tagCounts[tag] ?? 0})',
+                                style: TextStyle(
+                                  color: isSelected
+                                      ? Colors.white
+                                      : Colors.grey[800],
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
                           ),
                         );
-                      }).toList(),
+                      },
                     ),
                   ),
               ],
@@ -219,33 +252,42 @@ class _HomeScreenState extends State<HomeScreen> {
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : _links.isEmpty
-                    ? const Center(
-                        child: Text(
-                          '저장된 링크가 없습니다',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey,
+                : _error != null
+                    ? Center(child: Text(_error!))
+                    : _filteredLinks.isEmpty
+                        ? const Center(
+                            child: Text(
+                              '저장된 링크가 없습니다',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          )
+                        : RefreshIndicator(
+                            onRefresh: _loadLinks,
+                            child: ListView.builder(
+                              padding: const EdgeInsets.all(16),
+                              itemCount: _filteredLinks.length,
+                              itemBuilder: (context, index) {
+                                final link = _filteredLinks[index];
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 16),
+                                  child: LinkCard(
+                                    link: link,
+                                    onDelete: _handleDelete,
+                                    onLaunch: _handleLaunch,
+                                  ),
+                                );
+                              },
+                            ),
                           ),
-                        ),
-                      )
-                    : RefreshIndicator(
-                        onRefresh: _loadLinks,
-                        child: ListView.builder(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: _links.length,
-                          itemBuilder: (context, index) {
-                            final link = _links[index];
-                            return LinkCard(link: link);
-                          },
-                        ),
-                      ),
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
-          final result = await Navigator.push(
+          final result = await Navigator.push<bool>(
             context,
             MaterialPageRoute(
               builder: (context) => const SaveScreen(),

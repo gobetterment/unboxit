@@ -5,11 +5,13 @@ import 'package:http/http.dart' as http;
 import 'package:html/parser.dart' as parser;
 import 'package:html/dom.dart' as dom;
 import 'dart:convert';
+import '../models/link.dart';
 
 class SaveScreen extends StatefulWidget {
+  final Link? link;
   final String? initialUrl;
 
-  const SaveScreen({super.key, this.initialUrl});
+  const SaveScreen({super.key, this.link, this.initialUrl});
 
   @override
   State<SaveScreen> createState() => _SaveScreenState();
@@ -283,8 +285,6 @@ class DefaultStrategy extends MetadataStrategy {
 class _SaveScreenState extends State<SaveScreen> {
   final _formKey = GlobalKey<FormState>();
   final _urlController = TextEditingController();
-  final _titleController = TextEditingController();
-  final _descriptionController = TextEditingController();
   final _tagsController = TextEditingController();
   final _memoController = TextEditingController();
   bool _isLoading = false;
@@ -293,25 +293,176 @@ class _SaveScreenState extends State<SaveScreen> {
   @override
   void initState() {
     super.initState();
-    if (widget.initialUrl != null) {
+    if (widget.link != null) {
+      _urlController.text = widget.link!.url;
+      _tagsController.text = widget.link!.tags.join(', ');
+      _memoController.text = widget.link!.memo ?? '';
+    } else if (widget.initialUrl != null) {
       _urlController.text = widget.initialUrl!;
+      _updateAutoTags(widget.initialUrl!);
       _fetchMetadata(widget.initialUrl!).then((metadata) {
-        if (mounted) {
+        if (mounted && metadata != null) {
           setState(() {
             _metadata = metadata;
           });
         }
       });
     }
+
+    // URL 입력 시 자동으로 메타데이터와 태그 가져오기
+    _urlController.addListener(() {
+      final url = _urlController.text.trim();
+      if (url.isNotEmpty && Uri.parse(url).isAbsolute) {
+        _updateAutoTags(url);
+        _fetchMetadata(url).then((metadata) {
+          if (mounted && metadata != null) {
+            setState(() {
+              _metadata = metadata;
+            });
+          }
+        });
+      }
+    });
   }
 
-  String? _extractDomain(String url) {
+  void _updateAutoTags(String url) {
+    final autoTags = _getAutoTags(url);
+    if (autoTags.isNotEmpty) {
+      setState(() {
+        if (_tagsController.text.isEmpty) {
+          _tagsController.text = autoTags.join(', ');
+        } else {
+          // 기존 태그와 자동 태그를 합치기
+          final existingTags = _tagsController.text
+              .split(',')
+              .map((tag) => tag.trim())
+              .where((tag) => tag.isNotEmpty)
+              .toSet();
+          final newTags = autoTags.where((tag) => !existingTags.contains(tag));
+          if (newTags.isNotEmpty) {
+            _tagsController.text = [...existingTags, ...newTags].join(', ');
+          }
+        }
+      });
+    }
+  }
+
+  String _extractDomain(String url) {
     try {
       final uri = Uri.parse(url);
       return uri.host;
-    } catch (_) {
-      return null;
+    } catch (e) {
+      return '';
     }
+  }
+
+  List<String> _getAutoTags(String url) {
+    final domain = _extractDomain(url).toLowerCase();
+    final autoTags = <String>[];
+
+    // 동영상 플랫폼
+    if (domain.contains('youtube.com') || domain.contains('youtu.be')) {
+      autoTags.add('유튜브');
+      autoTags.add('동영상');
+    } else if (domain.contains('tv.naver.com')) {
+      autoTags.add('네이버TV');
+      autoTags.add('동영상');
+    } else if (domain.contains('tvcast.naver.com')) {
+      autoTags.add('네이버TV');
+      autoTags.add('동영상');
+    }
+
+    // SNS 플랫폼
+    else if (domain.contains('instagram.com')) {
+      autoTags.add('인스타그램');
+      autoTags.add('SNS');
+    } else if (domain.contains('threads.net')) {
+      autoTags.add('쓰레드');
+      autoTags.add('SNS');
+    } else if (domain.contains('twitter.com') || domain.contains('x.com')) {
+      autoTags.add('트위터');
+      autoTags.add('SNS');
+    } else if (domain.contains('facebook.com')) {
+      autoTags.add('페이스북');
+      autoTags.add('SNS');
+    } else if (domain.contains('linkedin.com')) {
+      autoTags.add('링크드인');
+      autoTags.add('SNS');
+    }
+
+    // 블로그 플랫폼
+    else if (domain.contains('blog.naver.com')) {
+      autoTags.add('블로그');
+      autoTags.add('네이버');
+    } else if (domain.contains('tistory.com')) {
+      autoTags.add('블로그');
+      autoTags.add('티스토리');
+    } else if (domain.contains('velog.io')) {
+      autoTags.add('블로그');
+      autoTags.add('벨로그');
+    } else if (domain.contains('medium.com')) {
+      autoTags.add('블로그');
+      autoTags.add('미디엄');
+    } else if (domain.contains('brunch.co.kr')) {
+      autoTags.add('블로그');
+      autoTags.add('브런치');
+    }
+
+    // 쇼핑몰
+    else if (domain.contains('coupang.com')) {
+      autoTags.add('쇼핑');
+      autoTags.add('쿠팡');
+    } else if (domain.contains('gmarket.co.kr')) {
+      autoTags.add('쇼핑');
+      autoTags.add('지마켓');
+    } else if (domain.contains('auction.co.kr')) {
+      autoTags.add('쇼핑');
+      autoTags.add('옥션');
+    } else if (domain.contains('11st.co.kr')) {
+      autoTags.add('쇼핑');
+      autoTags.add('11번가');
+    } else if (domain.contains('musinsa.com')) {
+      autoTags.add('쇼핑');
+      autoTags.add('무신사');
+    }
+
+    // 뉴스/미디어
+    else if (domain.contains('news.naver.com')) {
+      autoTags.add('뉴스');
+      autoTags.add('네이버뉴스');
+    } else if (domain.contains('daum.net/news')) {
+      autoTags.add('뉴스');
+      autoTags.add('다음뉴스');
+    } else if (domain.contains('chosun.com')) {
+      autoTags.add('뉴스');
+      autoTags.add('조선일보');
+    } else if (domain.contains('joongang.co.kr')) {
+      autoTags.add('뉴스');
+      autoTags.add('중앙일보');
+    } else if (domain.contains('donga.com')) {
+      autoTags.add('뉴스');
+      autoTags.add('동아일보');
+    }
+
+    // 지식/학습
+    else if (domain.contains('github.com')) {
+      autoTags.add('개발');
+      autoTags.add('깃허브');
+    } else if (domain.contains('notion.so')) {
+      autoTags.add('문서');
+      autoTags.add('노션');
+    } else if (domain.contains('ridibooks.com')) {
+      autoTags.add('도서');
+      autoTags.add('리디북스');
+    } else if (domain.contains('yes24.com')) {
+      autoTags.add('도서');
+      autoTags.add('예스24');
+    } else if (domain.contains('aladin.co.kr')) {
+      autoTags.add('도서');
+      autoTags.add('알라딘');
+    }
+
+    return autoTags;
   }
 
   String _normalizeYouTubeUrl(String url) {
@@ -349,67 +500,56 @@ class _SaveScreenState extends State<SaveScreen> {
   }
 
   Future<void> _handleSave() async {
-    if (_urlController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('URL을 입력해주세요')),
-      );
-      return;
-    }
+    if (!_formKey.currentState!.validate()) return;
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     try {
-      final metadata = await _fetchMetadata(_urlController.text);
-
-      if (metadata == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('메타데이터를 가져올 수 없습니다')),
-        );
-        return;
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) {
+        throw Exception('로그인이 필요합니다');
       }
 
-      // 태그를 배열로 처리
-      final tags = _tagsController.text.isNotEmpty
-          ? _tagsController.text
-              .split(',')
-              .map((e) => e.trim())
-              .where((e) => e.isNotEmpty)
-              .toList()
-          : <String>[];
+      final tags = _tagsController.text
+          .split(',')
+          .map((tag) => tag.trim())
+          .where((tag) => tag.isNotEmpty)
+          .toList();
 
-      await Supabase.instance.client.from('links').insert({
-        'url': _urlController.text,
-        'title': metadata['title'] ?? '',
-        'description': metadata['description'] ?? '',
-        'image': metadata['image'] ?? '',
-        'site_name': metadata['site_name'] ?? '',
-        'favicon': metadata['favicon'] ?? '',
-        'tags': tags, // 배열로 저장
+      final data = {
+        'url': _urlController.text.trim(),
+        'title':
+            _metadata?['title'] ?? _extractDomain(_urlController.text.trim()),
+        'tags': tags,
         'memo': _memoController.text,
-        'user_id': Supabase.instance.client.auth.currentUser?.id,
-        'created_at': DateTime.now().toIso8601String(),
-      });
+        'user_id': user.id,
+        'image': _metadata?['image'],
+        'favicon': _metadata?['favicon'],
+        'description': _metadata?['description'],
+        'created_at': DateTime.now().toLocal().toIso8601String(),
+      };
+
+      if (widget.link != null) {
+        await Supabase.instance.client
+            .from('links')
+            .update(data)
+            .eq('id', widget.link!.id);
+      } else {
+        await Supabase.instance.client.from('links').insert(data);
+      }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('링크가 저장되었습니다')),
-        );
-        Navigator.pop(context);
+        Navigator.pop(context, true);
       }
-    } catch (e) {
-      print('링크 저장 오류: $e');
+    } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('오류가 발생했습니다: $e')),
+          SnackBar(content: Text('오류가 발생했습니다: $error')),
         );
       }
     } finally {
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        setState(() => _isLoading = false);
       }
     }
   }
@@ -417,8 +557,6 @@ class _SaveScreenState extends State<SaveScreen> {
   @override
   void dispose() {
     _urlController.dispose();
-    _titleController.dispose();
-    _descriptionController.dispose();
     _tagsController.dispose();
     _memoController.dispose();
     super.dispose();
@@ -426,59 +564,76 @@ class _SaveScreenState extends State<SaveScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final domain = _urlController.text.isNotEmpty
-        ? _extractDomain(_urlController.text)
-        : null;
-
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('링크 저장'),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        title: Text(
+          widget.link != null ? '링크 수정' : '링크 저장',
+          style: const TextStyle(
+            color: Colors.black,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.close, color: Colors.black),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
       body: Form(
         key: _formKey,
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            TextField(
+            TextFormField(
               controller: _urlController,
               decoration: InputDecoration(
-                hintText: 'URL',
+                labelText: 'URL',
+                labelStyle: TextStyle(color: Colors.grey[600]),
                 filled: true,
                 fillColor: Colors.grey[100],
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
                 ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Colors.black, width: 1),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 16,
+                ),
               ),
-              enabled: !_isLoading,
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'URL을 입력해주세요';
+                }
+                if (!Uri.parse(value).isAbsolute) {
+                  return '올바른 URL을 입력해주세요';
+                }
+                return null;
+              },
+              onChanged: (url) {
+                if (url.isNotEmpty && Uri.parse(url).isAbsolute) {
+                  _updateAutoTags(url);
+                }
+              },
             ),
-            const SizedBox(height: 16),
             if (_metadata != null) ...[
+              const SizedBox(height: 16),
               Container(
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Colors.grey[100],
                   borderRadius: BorderRadius.circular(12),
                 ),
-                padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (_metadata?['image']?.isNotEmpty ?? false)
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: CachedNetworkImage(
-                          imageUrl: _metadata!['image']!,
-                          height: 200,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                          placeholder: (context, url) =>
-                              const Center(child: CircularProgressIndicator()),
-                          errorWidget: (context, url, error) =>
-                              const Icon(Icons.error),
-                        ),
-                      ),
-                    if (_metadata?['title']?.isNotEmpty ?? false) ...[
-                      const SizedBox(height: 8),
+                    if (_metadata!['title'] != null)
                       Text(
                         _metadata!['title']!,
                         style: const TextStyle(
@@ -486,27 +641,16 @@ class _SaveScreenState extends State<SaveScreen> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                    ],
-                    if (_metadata?['description']?.isNotEmpty ?? false) ...[
-                      const SizedBox(height: 4),
+                    if (_metadata!['description'] != null) ...[
+                      const SizedBox(height: 8),
                       Text(
                         _metadata!['description']!,
                         style: TextStyle(
                           fontSize: 14,
                           color: Colors.grey[600],
                         ),
-                        maxLines: 2,
+                        maxLines: 3,
                         overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                    if (domain != null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        domain,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[600],
-                        ),
                       ),
                     ],
                   ],
@@ -514,80 +658,82 @@ class _SaveScreenState extends State<SaveScreen> {
               ),
             ],
             const SizedBox(height: 16),
-            TextField(
-              controller: _titleController,
-              decoration: InputDecoration(
-                hintText: '제목',
-                filled: true,
-                fillColor: Colors.grey[100],
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-              enabled: !_isLoading,
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _descriptionController,
-              decoration: InputDecoration(
-                hintText: '설명',
-                filled: true,
-                fillColor: Colors.grey[100],
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-              maxLines: 3,
-              enabled: !_isLoading,
-            ),
-            const SizedBox(height: 16),
-            TextField(
+            TextFormField(
               controller: _tagsController,
               decoration: InputDecoration(
-                hintText: '태그 (쉼표로 구분)',
+                labelText: '태그',
+                labelStyle: TextStyle(color: Colors.grey[600]),
+                hintText: '예: 개발, Flutter, 프로그래밍',
+                hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
                 filled: true,
                 fillColor: Colors.grey[100],
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
                 ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Colors.black, width: 1),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 16,
+                ),
               ),
-              enabled: !_isLoading,
             ),
             const SizedBox(height: 16),
-            TextField(
+            TextFormField(
               controller: _memoController,
               decoration: InputDecoration(
-                hintText: '메모',
+                labelText: '메모',
+                labelStyle: TextStyle(color: Colors.grey[600]),
                 filled: true,
                 fillColor: Colors.grey[100],
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Colors.black, width: 1),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 16,
                 ),
               ),
               maxLines: 3,
-              enabled: !_isLoading,
             ),
             const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: _isLoading ? null : _handleSave,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.black,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+            SizedBox(
+              height: 50,
+              child: ElevatedButton(
+                onPressed: _isLoading ? null : _handleSave,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.black,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 0,
                 ),
-              ),
-              child: Text(
-                _isLoading ? '저장 중...' : '저장',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+                child: _isLoading
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : Text(
+                        widget.link != null ? '수정' : '저장',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
               ),
             ),
           ],
