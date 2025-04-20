@@ -19,7 +19,7 @@ publish_to: "none" # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+1
 
 environment:
-  sdk: ">=3.3.0 <4.0.0"
+  sdk: ">=3.2.3 <4.0.0"
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -33,21 +33,24 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   cupertino_icons: ^1.0.2
-  supabase_flutter: ^2.3.4
-  url_launcher: ^6.2.5
+  supabase_flutter: ^2.3.2
+  url_launcher: ^6.2.4
   cached_network_image: ^3.3.1
   flutter_slidable: ^3.0.1
   http: ^1.2.0
   html: ^0.15.4
-  flutter_svg: ^2.0.10+1
+  flutter_svg: ^2.0.9
   app_links: ^6.4.0
   metadata_fetch: ^0.4.1
   flutter_dotenv: ^5.1.0
-  google_sign_in: ^6.2.2
-  google_sign_in_ios: ^5.9.0
+  google_sign_in: ^6.2.1
+  google_sign_in_ios: ^5.6.5
   sign_in_with_apple: ^5.0.0
   font_awesome_flutter: ^10.7.0
   webview_flutter: ^4.9.0
+  flutter_secure_storage: ^9.0.0
+  flutter_launcher_icons: ^0.13.1
+  flutter_native_splash: ^2.3.10
 
 dev_dependencies:
   flutter_test:
@@ -59,7 +62,6 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^2.0.0
-  flutter_launcher_icons: ^0.13.1
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -104,7 +106,14 @@ flutter:
 flutter_launcher_icons:
   android: "launcher_icon"
   ios: true
-  image_path: "assets/images/app_icon.png"
+  image_path: "assets/images/unboxit_logo.png"
   adaptive_icon_background: "#FFFFFF"
   min_sdk_android: 21
   remove_alpha_ios: true
+
+flutter_native_splash:
+  color: "#FFFFFF"
+  image: assets/images/unboxit_logo.png
+  android_12:
+    image: assets/images/unboxit_logo.png
+    icon_background_color: "#FFFFFF"
