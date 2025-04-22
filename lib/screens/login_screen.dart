@@ -80,56 +80,34 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _handleGoogleSignIn() async {
     try {
-      setState(() {
-        _isLoading = true;
-      });
+      final GoogleSignIn googleSignIn = GoogleSignIn(
+          clientId:
+              '11791669621-bq01rb1hobrdgri1bks3ltge64e6i36g.apps.googleusercontent.com',
+          serverClientId:
+              '11791669621-bq01rb1hobrdgri1bks3ltge64e6i36g.apps.googleusercontent.com');
 
-      final googleSignIn = GoogleSignIn();
       final googleUser = await googleSignIn.signIn();
-
-      if (googleUser == null) {
-        setState(() {
-          _isLoading = false;
-        });
-        return;
-      }
+      if (googleUser == null) return;
 
       final googleAuth = await googleUser.authentication;
-      final accessToken = googleAuth.accessToken;
-      final idToken = googleAuth.idToken;
-
-      if (accessToken == null) {
-        throw 'No Access Token found.';
-      }
-      if (idToken == null) {
-        throw 'No ID Token found.';
-      }
-
       final response = await Supabase.instance.client.auth.signInWithIdToken(
         provider: OAuthProvider.google,
-        idToken: idToken,
-        accessToken: accessToken,
+        idToken: googleAuth.idToken!,
+        accessToken: googleAuth.accessToken,
       );
 
       if (response.user != null) {
-        if (!mounted) return;
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
-        );
+        if (mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => const HomeScreen()),
+          );
+        }
       }
     } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: ${error.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    } finally {
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('로그인 중 오류가 발생했습니다: $error')),
+        );
       }
     }
   }
