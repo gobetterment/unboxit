@@ -1,100 +1,105 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:app_links/app_links.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:receive_sharing_intent/receive_sharing_intent.dart';
+import 'dart:async';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/save_screen.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 void main() async {
-  try {
-    WidgetsFlutterBinding.ensureInitialized();
-    await dotenv.load();
+  WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: ".env");
 
-    await Supabase.initialize(
-      url: dotenv.env['SUPABASE_URL'] ?? '',
-      anonKey: dotenv.env['SUPABASE_ANON_KEY'] ?? '',
-    );
+  await Supabase.initialize(
+    url: dotenv.env['SUPABASE_URL']!,
+    anonKey: dotenv.env['SUPABASE_ANON_KEY']!,
+  );
 
-    runApp(const MyApp());
-  } catch (e) {
-    print('초기화 오류: $e');
-    // 기본값으로 초기화
-    await Supabase.initialize(
-      url: 'https://oxilbpwgesihgkrcjztv.supabase.co',
-      anonKey:
-          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im94aWxicHdnZXNpaGdrcmNqenR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQyODg1OTIsImV4cCI6MjA1OTg2NDU5Mn0.5XgRB1PQ5lIhjqtJQ0K0ag8rkCj3SwjcODlA2e7vKlo',
-    );
-    runApp(const MyApp());
-  }
+  runApp(const MyApp());
 }
 
-class MyApp extends StatefulWidget {
+class MyApp extends StatelessWidget {
   const MyApp({super.key});
-
-  @override
-  State<MyApp> createState() => _MyAppState();
-}
-
-class _MyAppState extends State<MyApp> {
-  final _navigatorKey = GlobalKey<NavigatorState>();
-  late AppLinks _appLinks;
-
-  @override
-  void initState() {
-    super.initState();
-    _initAppLinks();
-  }
-
-  void _initAppLinks() async {
-    _appLinks = AppLinks();
-    _appLinks.uriLinkStream.listen((Uri uri) {
-      if (uri.scheme == 'unboxit' && uri.host == 'share') {
-        final sharedUrl = uri.queryParameters['url'];
-        if (sharedUrl != null) {
-          _navigateToSaveScreen(sharedUrl);
-        }
-      }
-    }, onError: (err) {
-      print('URI 스트림 에러: $err');
-    });
-  }
-
-  void _navigateToSaveScreen(String url) {
-    final context = _navigatorKey.currentContext;
-    if (context != null) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => SaveScreen(initialUrl: url),
-        ),
-      );
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      navigatorKey: _navigatorKey,
       title: '꺼내보기',
       theme: ThemeData(
-        colorScheme: const ColorScheme.light(
-          surface: Colors.white,
-          surfaceTint: Colors.white,
-        ),
+        primarySwatch: Colors.blue,
         useMaterial3: true,
       ),
-      home: StreamBuilder<AuthState>(
-        stream: Supabase.instance.client.auth.onAuthStateChange,
-        builder: (context, snapshot) {
-          if (snapshot.hasData) {
-            final session = snapshot.data?.session;
-            return session != null ? const HomeScreen() : const LoginScreen();
-          }
-          return const LoginScreen();
-        },
-      ),
+      home: const AuthWrapper(),
     );
+  }
+}
+
+class AuthWrapper extends StatefulWidget {
+  const AuthWrapper({super.key});
+
+  @override
+  State<AuthWrapper> createState() => _AuthWrapperState();
+}
+
+class _AuthWrapperState extends State<AuthWrapper> {
+  StreamSubscription? _intentDataStreamSubscription;
+  String? _sharedLink;
+
+  @override
+  void initState() {
+    super.initState();
+    _intentDataStreamSubscription = ReceiveSharingIntent.instance
+        .getMediaStream()
+        .listen((List<SharedMediaFile> value) {
+      if (value.isNotEmpty) {
+        setState(() {
+          _sharedLink = value.first.path;
+        });
+      }
+    }, onError: (err) {
+      print("getLinkStream error: $err");
+    });
+
+    ReceiveSharingIntent.instance
+        .getInitialMedia()
+        .then((List<SharedMediaFile>? value) {
+      if (value != null && value.isNotEmpty) {
+        setState(() {
+          _sharedLink = value.first.path;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _intentDataStreamSubscription?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final session = Supabase.instance.client.auth.currentSession;
+
+    if (session == null) {
+      return const LoginScreen();
+    }
+
+    if (_sharedLink != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => SaveScreen(initialUrl: _sharedLink),
+          ),
+        );
+        setState(() {
+          _sharedLink = null;
+        });
+      });
+    }
+
+    return const HomeScreen();
   }
 }
 

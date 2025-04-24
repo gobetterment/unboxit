@@ -64,8 +64,36 @@
 				<string>com.googleusercontent.apps.11791669621-bq01rb1hobrdgri1bks3ltge64e6i36g</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>꺼내보기</string>
+			</array>
+		</dict>
 	</array>
 	<key>GIDClientID</key>
 	<string>11791669621-bq01rb1hobrdgri1bks3ltge64e6i36g.apps.googleusercontent.com</string>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
+	<key>UIFileSharingEnabled</key>
+	<true/>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>앱에서 공유된 이미지를 처리하기 위해 필요합니다.</string>
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>UnboxIt Shared Items</string>
+			<key>LSHandlerRank</key>
+			<string>Default</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>public.content</string>
+				<string>public.data</string>
+				<string>public.text</string>
+				<string>public.url</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

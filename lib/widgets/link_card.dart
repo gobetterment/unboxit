@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/link.dart';
 import '../screens/save_screen.dart';
@@ -29,27 +28,6 @@ class LinkCard extends StatelessWidget {
       return uri.host;
     } catch (e) {
       return url;
-    }
-  }
-
-  Future<void> _launchURL(BuildContext context) async {
-    try {
-      final url = Uri.parse(link.url);
-      if (await canLaunchUrl(url)) {
-        await launchUrl(url, mode: LaunchMode.externalApplication);
-      } else {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('URL을 열 수 없습니다')),
-          );
-        }
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('오류가 발생했습니다: $e')),
-        );
-      }
     }
   }
 
